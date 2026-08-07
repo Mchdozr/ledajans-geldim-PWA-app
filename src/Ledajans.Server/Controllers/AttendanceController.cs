@@ -125,7 +125,15 @@ public class AttendanceController : ControllerBase
         if (!await IsActiveEmployeeAsync())
             return Unauthorized(new { message = "Hesabınız pasif." });
 
-        var distance = await GetDistanceMetersAsync(request, await _locationScope.RequireEmployeeLocationIdAsync(UserId));
+        var locationId = await _locationScope.RequireEmployeeLocationIdAsync(UserId);
+        var geo = await ValidateGeofenceAsync(request, locationId);
+        if (geo.Error is not null)
+            return Ok(new CheckOutResponse
+            {
+                Success = false,
+                Message = geo.Error,
+                DistanceMeters = geo.Distance
+            });
 
         var today = AppTime.Today;
         var record = await FindTodayRecordEntityAsync(UserId, today);
@@ -136,7 +144,7 @@ public class AttendanceController : ControllerBase
             {
                 Success = false,
                 Message = "Önce 'Geldim' işaretlemeniz gerekiyor.",
-                DistanceMeters = distance
+                DistanceMeters = geo.Distance
             });
         }
 
@@ -146,7 +154,7 @@ public class AttendanceController : ControllerBase
             {
                 Success = false,
                 Message = "Bugün zaten 'Çıkış Yaptım' işaretlediniz.",
-                DistanceMeters = distance
+                DistanceMeters = geo.Distance
             });
         }
 
@@ -154,7 +162,7 @@ public class AttendanceController : ControllerBase
         record.CheckOutUtc = now;
         record.CheckOutLatitude = request.Latitude;
         record.CheckOutLongitude = request.Longitude;
-        record.CheckOutDistanceMeters = distance;
+        record.CheckOutDistanceMeters = geo.Distance;
         record.CheckOutIpAddress = ClientIpHelper.GetClientIp(HttpContext);
 
         await _db.SaveChangesAsync();
@@ -164,22 +172,8 @@ public class AttendanceController : ControllerBase
             Success = true,
             Message = "Çıkışınız başarıyla kaydedildi.",
             CheckOutUtc = now,
-            DistanceMeters = distance
+            DistanceMeters = geo.Distance
         });
-    }
-
-    private async Task<double> GetDistanceMetersAsync(CheckInRequest request, int locationId)
-    {
-        if (!GeoHelper.AreValidCoordinates(request.Latitude, request.Longitude))
-            return 0;
-
-        var geofence = await _db.Geofences.FirstOrDefaultAsync(g => g.IsActive && g.LocationId == locationId);
-        if (geofence is null)
-            return 0;
-
-        return Math.Round(GeoHelper.DistanceMeters(
-            geofence.Latitude, geofence.Longitude,
-            request.Latitude, request.Longitude), 1);
     }
 
     [HttpPost("manual")]

@@ -20,6 +20,10 @@ public class AuthService
     public async Task<string?> LoginAsync(LoginRequest request)
     {
         request.DeviceId = await _deviceService.GetDeviceIdAsync();
+        if (string.IsNullOrWhiteSpace(request.DeviceId))
+        {
+            return "Cihaz tanımlanamadı. Sayfayı yenileyip tekrar deneyin (önbelleği temizlemeniz gerekebilir).";
+        }
 
         var response = await _http.PostAsJsonAsync("api/auth/login", request);
         if (!response.IsSuccessStatusCode)

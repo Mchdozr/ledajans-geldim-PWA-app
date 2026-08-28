@@ -37,6 +37,22 @@
                 });
             }
         })();
+
+        // Inline bootstrap: login must work even if js/app.js fails (SW/network).
+        window.ledajansDevice = window.ledajansDevice || {
+            storageKey: 'ledajans_device_id',
+            getOrCreateId: function () {
+                try {
+                    var id = localStorage.getItem(this.storageKey);
+                    if (id && id.length >= 16 && id.length <= 128) return id;
+                    id = crypto.randomUUID();
+                    localStorage.setItem(this.storageKey, id);
+                    return id;
+                } catch (e) {
+                    return null;
+                }
+            }
+        };
     </script>
 </head>
 
@@ -57,7 +73,7 @@
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
             integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    <script src="js/app.js?v=20260629e"></script>
+    <script src="js/app.js?v=20260828a"></script>
     <script>
         window.addEventListener('load', function () {
             if (!('serviceWorker' in navigator)) return;

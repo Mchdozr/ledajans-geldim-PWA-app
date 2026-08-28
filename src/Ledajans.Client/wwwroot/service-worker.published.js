@@ -64,7 +64,25 @@ async function onFetch(event) {
         const request = shouldServeIndexHtml ? 'index.html' : event.request;
         const cache = await caches.open(cacheName);
         cachedResponse = await cache.match(request);
+        // Query string (?v=...) cache miss: match by pathname (e.g. js/app.js?v=x)
+        if (!cachedResponse && !shouldServeIndexHtml && url.search) {
+            cachedResponse = await cache.match(url.pathname);
+        }
     }
 
-    return cachedResponse || fetch(event.request);
+    if (cachedResponse) {
+        return cachedResponse;
+    }
+
+    try {
+        return await fetch(event.request);
+    } catch (error) {
+        // Network down: avoid rejecting FetchEvent when possible
+        if (event.request.mode === 'navigate') {
+            const cache = await caches.open(cacheName);
+            const offlineIndex = await cache.match('index.html');
+            if (offlineIndex) return offlineIndex;
+        }
+        throw error;
+    }
 }

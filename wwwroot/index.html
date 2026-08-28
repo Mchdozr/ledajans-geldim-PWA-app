@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Ledajans Geldim</title>
+    <base href="/" />
+    <meta name="theme-color" content="#f46f2c" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="LEDAJANS" />
+    <meta name="description" content="Ledajans çalışan konum tabanlı yoklama uygulaması" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" rel="stylesheet" />
+    <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <link href="manifest.webmanifest" rel="manifest" />
+    <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png" />
+    <script>
+        (function () {
+            var h = location.hostname;
+            if (h !== 'localhost' && h !== '127.0.0.1') return;
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(function (regs) {
+                    regs.forEach(function (reg) { reg.unregister(); });
+                });
+            }
+            if ('caches' in window) {
+                caches.keys().then(function (keys) {
+                    keys.forEach(function (key) { caches.delete(key); });
+                });
+            }
+        })();
+
+        // Inline bootstrap: login must work even if js/app.js fails (SW/network).
+        window.ledajansDevice = window.ledajansDevice || {
+            storageKey: 'ledajans_device_id',
+            getOrCreateId: function () {
+                try {
+                    var id = localStorage.getItem(this.storageKey);
+                    if (id && id.length >= 16 && id.length <= 128) return id;
+                    id = crypto.randomUUID();
+                    localStorage.setItem(this.storageKey, id);
+                    return id;
+                } catch (e) {
+                    return null;
+                }
+            }
+        };
+    </script>
+</head>
+
+<body>
+    <div id="app">
+        <div class="app-loading">
+            <div class="app-loading-spinner"></div>
+            <p>Ledajans yükleniyor...</p>
+        </div>
+    </div>
+
+    <div id="blazor-error-ui">
+        Beklenmeyen bir hata oluştu.
+        <a href="" class="reload">Yenile</a>
+        <a class="dismiss">🗙</a>
+    </div>
+    <script src="_framework/blazor.webassembly.js"></script>
+    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="js/app.js?v=20260828a"></script>
+    <script>
+        window.addEventListener('load', function () {
+            if (!('serviceWorker' in navigator)) return;
+            if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') return;
+
+            navigator.serviceWorker.register('service-worker.js').then(function (reg) {
+                reg.addEventListener('updatefound', function () {
+                    var worker = reg.installing;
+                    if (!worker) return;
+                    worker.addEventListener('statechange', function () {
+                        if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+                            if (confirm('Yeni sürüm hazır. Sayfa yenilensin mi?')) {
+                                sessionStorage.setItem('ledajans-sw-reload', '1');
+                                worker.postMessage({ type: 'SKIP_WAITING' });
+                            }
+                        }
+                    });
+                });
+            });
+
+            navigator.serviceWorker.addEventListener('controllerchange', function () {
+                if (sessionStorage.getItem('ledajans-sw-reload') !== '1') return;
+                sessionStorage.removeItem('ledajans-sw-reload');
+                if (window.__ledajansSwReloaded) return;
+                window.__ledajansSwReloaded = true;
+                location.reload();
+            });
+        });
+    </script>
+</body>
+
+</html>

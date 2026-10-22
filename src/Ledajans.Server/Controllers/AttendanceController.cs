@@ -189,10 +189,10 @@ public class AttendanceController : ControllerBase
             return NotFound(new { message = "Kullanıcı bulunamadı." });
 
         if (!await _userManager.IsInRoleAsync(user, Roles.Employee))
-            return BadRequest(new { message = "Yalnızca çalışan hesaplarına manuel kayıt eklenebilir." });
+            return BadRequest(new { message = "Yalnızca çalışan hesaplarına kayıt eklenebilir." });
 
         if (!user.IsActive)
-            return BadRequest(new { message = "Pasif çalışana manuel kayıt eklenemez." });
+            return BadRequest(new { message = "Pasif çalışana kayıt eklenemez." });
 
         if (user.LocationId != adminLocationId)
             return BadRequest(new { message = "Seçili kuruma ait olmayan çalışana kayıt eklenemez." });
@@ -206,14 +206,15 @@ public class AttendanceController : ControllerBase
 
         var geofence = await _db.Geofences.FirstOrDefaultAsync(g => g.LocationId == adminLocationId);
         var policy = await _policy.GetResolvedAsync(adminLocationId.Value);
-        var checkInUtc = localDate == AppTime.Today
-            ? DateTime.UtcNow
-            : AppTime.TurkeyLocalToUtc(localDate, policy.LateThreshold);
+        var localTime = request.LocalTime
+            ?? (localDate == AppTime.Today
+                ? AppTime.TimeInTurkey(DateTime.UtcNow)
+                : policy.LateThreshold);
         var record = new AttendanceRecord
         {
             LocationId = adminLocationId.Value,
             UserId = request.UserId,
-            CheckInUtc = checkInUtc,
+            CheckInUtc = AppTime.TurkeyLocalToUtc(localDate, localTime),
             LocalDate = localDate,
             Latitude = geofence?.Latitude ?? 0,
             Longitude = geofence?.Longitude ?? 0,
@@ -227,6 +228,27 @@ public class AttendanceController : ControllerBase
         await _db.SaveChangesAsync();
 
         return Ok(await MapToReportItemAsync(record, user, adminLocationId.Value));
+    }
+
+    [HttpPut("{id:int}")]
+    [Authorize(Roles = Roles.Admin)]
+    public async Task<ActionResult<AttendanceReportItem>> UpdateCheckInTime(int id, UpdateCheckInTimeRequest request)
+    {
+        var locationId = await _locationScope.GetAdminLocationIdAsync();
+        if (locationId is null)
+            return BadRequest(new { message = "Kurum seçimi gerekli." });
+
+        var record = await _db.AttendanceRecords.FindAsync(id);
+        if (record is null || record.LocationId != locationId)
+            return NotFound();
+
+        var user = await _userManager.FindByIdAsync(record.UserId);
+        if (user is null)
+            return NotFound();
+
+        record.CheckInUtc = AppTime.TurkeyLocalToUtc(record.LocalDate, request.LocalTime);
+        await _db.SaveChangesAsync();
+        return Ok(await MapToReportItemAsync(record, user, locationId.Value));
     }
 
     [HttpDelete("{id:int}")]

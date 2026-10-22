@@ -45,6 +45,13 @@ public class AttendanceService
         return await response.Content.ReadFromJsonAsync<AttendanceReportItem>();
     }
 
+    public async Task<AttendanceReportItem?> UpdateCheckInTimeAsync(int id, TimeOnly localTime)
+    {
+        var response = await _http.PutAsJsonAsync($"api/attendance/{id}", new UpdateCheckInTimeRequest { LocalTime = localTime });
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<AttendanceReportItem>();
+    }
+
     public async Task<bool> DeleteAsync(int id)
     {
         var response = await _http.DeleteAsync($"api/attendance/{id}");

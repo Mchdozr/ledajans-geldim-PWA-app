@@ -262,8 +262,16 @@ public record ManualCheckInRequest
 
     public DateOnly? LocalDate { get; set; }
 
+    public TimeOnly? LocalTime { get; set; }
+
     [MaxLength(500)]
     public string? Note { get; set; }
+}
+
+public record UpdateCheckInTimeRequest
+{
+    [Required]
+    public TimeOnly LocalTime { get; set; }
 }
 
 public record MyAttendanceHistoryItem

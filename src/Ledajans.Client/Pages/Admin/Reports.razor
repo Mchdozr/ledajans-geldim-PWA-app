@@ -59,7 +59,7 @@
                 </MudChip>
                 <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
                            StartIcon="@Icons.Material.Filled.PersonAdd" OnClick="OpenManualDialog">
-                    Manuel Ekle
+                    Giriş Ekle
                 </MudButton>
                 <MudButton Variant="Variant.Outlined" Color="Color.Success" Size="Size.Small"
                            StartIcon="@Icons.Material.Filled.Download" OnClick="ExportAbsentToday"
@@ -109,12 +109,10 @@
                                     {
                                         <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Outlined">Geç kaldı</MudChip>
                                     }
-                                    @if (r.IsManual)
-                                    {
-                                        <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">Manuel</MudChip>
-                                    }
                                 </td>
                                 <td>
+                                    <MudIconButton Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" Color="Color.Primary"
+                                                   title="Saati düzenle" OnClick="@(() => OpenTimeDialog(r))" />
                                     <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
                                                    OnClick="@(() => DeleteRecord(r))" />
                                 </td>
@@ -140,7 +138,7 @@
                                 <span>@a.FullName <span class="mud-text-secondary">(@a.Department)</span></span>
                                 <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary"
                                            OnClick="@(() => QuickManualAdd(a.UserId))">
-                                    Manuel ekle
+                                    Giriş ekle
                                 </MudButton>
                             </div>
                         </MudListItem>
@@ -238,13 +236,11 @@
                     {
                         <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Outlined">Geç kaldı</MudChip>
                     }
-                    @if (context.IsManual)
-                    {
-                        <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">Manuel</MudChip>
-                    }
                 </MudTd>
                 <MudTd>@context.DistanceMeters</MudTd>
                 <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" Color="Color.Primary"
+                                   title="Saati düzenle" OnClick="@(() => OpenTimeDialog(context))" />
                     <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
                                    OnClick="@(() => DeleteRecord(context))" />
                 </MudTd>
@@ -293,13 +289,11 @@
                                     {
                                         <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Outlined" Class="mr-1">Geç</MudChip>
                                     }
-                                    @if (record.IsManual)
-                                    {
-                                        <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined" Class="mr-1">Manuel</MudChip>
-                                    }
                                     <span class="admin-reports-distance">@record.DistanceMeters.ToString("F0") m</span>
                                 </span>
                             </div>
+                            <MudIconButton Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" Color="Color.Primary"
+                                           title="Saati düzenle" OnClick="@(() => OpenTimeDialog(record))" />
                             <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
                                            OnClick="@(() => DeleteRecord(record))" />
                         </div>
@@ -312,7 +306,7 @@
 
 <MudDialog @bind-Visible="_manualDialogOpen" Options="_dialogOptions">
     <TitleContent>
-        <MudText Typo="Typo.h6">Manuel Giriş Ekle</MudText>
+        <MudText Typo="Typo.h6">Giriş Ekle</MudText>
     </TitleContent>
     <DialogContent>
         <MudSelect T="string" @bind-Value="_manualUserId" Label="Çalışan" Variant="Variant.Outlined" Class="mb-3" Required="true">
@@ -322,11 +316,29 @@
             }
         </MudSelect>
         <MudDatePicker @bind-Date="_manualDate" Label="Tarih" Variant="Variant.Outlined" DateFormat="dd.MM.yyyy" Class="mb-3" />
+        <MudTimePicker @bind-Time="_manualTime" Label="Giriş saati" Variant="Variant.Outlined" AmPm="false" Class="mb-3" />
         <MudTextField @bind-Value="_manualNote" Label="Not (isteğe bağlı)" Variant="Variant.Outlined" Lines="2" />
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="@(() => _manualDialogOpen = false)">İptal</MudButton>
         <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveManual" Disabled="_manualSaving">Kaydet</MudButton>
+    </DialogActions>
+</MudDialog>
+
+<MudDialog @bind-Visible="_timeDialogOpen" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Giriş Saati</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_editingRecord is not null)
+        {
+            <MudText Typo="Typo.body2" Class="mb-3">@_editingRecord.FullName · @TurkishFormat.FormatDate(_editingRecord.LocalDate)</MudText>
+            <MudTimePicker @bind-Time="_editTime" Label="Giriş saati" Variant="Variant.Outlined" AmPm="false" />
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _timeDialogOpen = false)">İptal</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveTime" Disabled="_timeSaving">Kaydet</MudButton>
     </DialogActions>
 </MudDialog>
 
@@ -350,7 +362,12 @@
     private bool _manualSaving;
     private string? _manualUserId;
     private DateTime? _manualDate = AppTime.TodayDate;
+    private TimeSpan? _manualTime;
     private string? _manualNote;
+    private bool _timeDialogOpen;
+    private bool _timeSaving;
+    private AttendanceReportItem? _editingRecord;
+    private TimeSpan? _editTime;
     private readonly DialogOptions _dialogOptions = new() { MaxWidth = MaxWidth.Small, FullWidth = true };
     private string _workStartTime = "09:15";
 
@@ -484,6 +501,7 @@
     {
         _manualUserId = null;
         _manualDate = AppTime.TodayDate;
+        _manualTime = TurkeyNow();
         _manualNote = null;
         _manualDialogOpen = true;
     }
@@ -492,9 +510,19 @@
     {
         _manualUserId = userId;
         _manualDate = AppTime.TodayDate;
+        _manualTime = TurkeyNow();
         _manualNote = null;
         _manualDialogOpen = true;
     }
+
+    private void OpenTimeDialog(AttendanceReportItem record)
+    {
+        _editingRecord = record;
+        _editTime = record.CheckInUtc.AddHours(3).TimeOfDay;
+        _timeDialogOpen = true;
+    }
+
+    private static TimeSpan TurkeyNow() => DateTime.UtcNow.AddHours(3).TimeOfDay;
 
     private async Task SaveManual()
     {
@@ -504,11 +532,18 @@
             return;
         }
 
+        if (_manualTime is null)
+        {
+            Snackbar.Add("Giriş saati seçin.", Severity.Warning);
+            return;
+        }
+
         _manualSaving = true;
         var result = await AttendanceService.ManualCheckInAsync(new ManualCheckInRequest
         {
             UserId = _manualUserId,
             LocalDate = _manualDate is null ? null : DateOnly.FromDateTime(_manualDate.Value),
+            LocalTime = TimeOnly.FromTimeSpan(_manualTime.Value),
             Note = _manualNote
         });
 
@@ -519,8 +554,31 @@
             return;
         }
 
-        Snackbar.Add("Manuel kayıt eklendi.", Severity.Success);
+        Snackbar.Add("Kayıt eklendi.", Severity.Success);
         _manualDialogOpen = false;
+        await LoadSummary();
+        await Load();
+    }
+
+    private async Task SaveTime()
+    {
+        if (_editingRecord is null || _editTime is null)
+        {
+            Snackbar.Add("Giriş saati seçin.", Severity.Warning);
+            return;
+        }
+
+        _timeSaving = true;
+        var result = await AttendanceService.UpdateCheckInTimeAsync(_editingRecord.Id, TimeOnly.FromTimeSpan(_editTime.Value));
+        _timeSaving = false;
+        if (result is null)
+        {
+            Snackbar.Add("Saat güncellenemedi.", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("Giriş saati güncellendi.", Severity.Success);
+        _timeDialogOpen = false;
         await LoadSummary();
         await Load();
     }

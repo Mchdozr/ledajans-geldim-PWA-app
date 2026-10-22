@@ -3,6 +3,7 @@
 @inject UserService UserService
 @inject DepartmentService DepartmentService
 @inject ReportService ReportService
+@inject AttendanceService AttendanceService
 @inject GeolocationService GeolocationService
 @inject HttpClient Http
 @inject ISnackbar Snackbar
@@ -246,7 +247,7 @@
                                 </span>
                                 <span class="admin-history-detail">
                                     Giriş @record.DistanceMeters.ToString("F0") m
-                                    @if (!string.IsNullOrWhiteSpace(record.IpAddress))
+                                    @if (!string.IsNullOrWhiteSpace(record.IpAddress) && record.IpAddress != "manual")
                                     {
                                         <span> · @record.IpAddress</span>
                                     }
@@ -256,6 +257,8 @@
                                      Color="@(record.CheckOutUtc is not null ? Color.Success : Color.Warning)">
                                 @(record.CheckOutUtc is not null ? "Tamamlandı" : "Yalnızca giriş")
                             </MudChip>
+                            <MudIconButton Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" Color="Color.Primary"
+                                           title="Saati düzenle" OnClick="@(() => OpenTimeDialog(record))" />
                         </div>
                     }
                 </div>
@@ -273,6 +276,23 @@
         <MudSpacer />
         <MudButton OnClick="@(() => _historyVisible = false)" Size="Size.Small">Kapat</MudButton>
         </div>
+    </DialogActions>
+</MudDialog>
+
+<MudDialog @bind-Visible="_timeDialogOpen" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Giriş Saati</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_editingRecord is not null)
+        {
+            <MudText Typo="Typo.body2" Class="mb-3">@TurkishFormat.FormatDate(_editingRecord.LocalDate)</MudText>
+            <MudTimePicker @bind-Time="_editTime" Label="Giriş saati" Variant="Variant.Outlined" AmPm="false" />
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _timeDialogOpen = false)" Size="Size.Small">İptal</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small" OnClick="SaveTime" Disabled="_timeSaving">Kaydet</MudButton>
     </DialogActions>
 </MudDialog>
 
@@ -310,6 +330,10 @@
     private List<AttendanceReportItem> _historyRecords = new();
     private DateTime? _historyFrom;
     private DateTime? _historyTo;
+    private bool _timeDialogOpen;
+    private bool _timeSaving;
+    private AttendanceReportItem? _editingRecord;
+    private TimeSpan? _editTime;
 
     protected override async Task OnInitializedAsync()
     {
@@ -537,6 +561,35 @@
         {
             _historyLoading = false;
         }
+    }
+
+    private void OpenTimeDialog(AttendanceReportItem record)
+    {
+        _editingRecord = record;
+        _editTime = record.CheckInUtc.AddHours(3).TimeOfDay;
+        _timeDialogOpen = true;
+    }
+
+    private async Task SaveTime()
+    {
+        if (_editingRecord is null || _editTime is null)
+        {
+            Snackbar.Add("Giriş saati seçin.", Severity.Warning);
+            return;
+        }
+
+        _timeSaving = true;
+        var result = await AttendanceService.UpdateCheckInTimeAsync(_editingRecord.Id, TimeOnly.FromTimeSpan(_editTime.Value));
+        _timeSaving = false;
+        if (result is null)
+        {
+            Snackbar.Add("Saat güncellenemedi.", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("Giriş saati güncellendi.", Severity.Success);
+        _timeDialogOpen = false;
+        await LoadHistory();
     }
 
     private async Task ExportHistory()

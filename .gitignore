@@ -7,6 +7,9 @@ obj/
 *.userosscache
 *.sln.docstates
 
+## Runtime fault logs
+logs/
+
 ## Build results
 [Dd]ebug/
 [Rr]elease/

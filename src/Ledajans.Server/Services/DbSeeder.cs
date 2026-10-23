@@ -15,7 +15,8 @@ public static class DbSeeder
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
 
-        await db.Database.MigrateAsync();
+        var strategy = db.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () => await db.Database.MigrateAsync());
         var pending = (await db.Database.GetPendingMigrationsAsync()).ToList();
         if (pending.Count > 0)
         {

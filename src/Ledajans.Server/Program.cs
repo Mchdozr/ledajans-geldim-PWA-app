@@ -4,6 +4,7 @@ using Ledajans.Server.Data;
 using Ledajans.Server.Services;
 using Ledajans.Shared;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.StaticFiles;
@@ -36,10 +37,15 @@ if (builder.Environment.IsDevelopment() && !runningInContainer)
     });
 }
 
+var connectionString = MySqlResilience.Apply(builder.Configuration.GetConnectionString("DefaultConnection") ?? "");
+
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseMySql(
-        builder.Configuration.GetConnectionString("DefaultConnection")!,
-        new MySqlServerVersion(new Version(10, 11, 8))));
+        connectionString,
+        new MySqlServerVersion(new Version(10, 11, 8)),
+        mysql => mysql.EnableRetryOnFailure(3, TimeSpan.FromSeconds(2), null)));
+
+builder.Services.AddHostedService<DatabaseKeepAliveService>();
 
 builder.Services.AddIdentityCore<ApplicationUser>(options =>
     {
@@ -127,7 +133,40 @@ if (app.Environment.IsDevelopment())
 }
 else
 {
-    app.UseExceptionHandler("/Error");
+    app.UseExceptionHandler(handler =>
+    {
+        handler.Run(async context =>
+        {
+            try
+            {
+                var ex = context.Features.Get<IExceptionHandlerFeature>()?.Error;
+                if (ex is not null)
+                {
+                    if (MySqlResilience.IsPoolPoisoning(ex))
+                        MySqlResilience.ClearPools();
+
+                    ServerFaultLog.Write(
+                        app.Environment.ContentRootPath,
+                        "unhandled.txt",
+                        $"{context.Request.Method} {context.Request.Path}{Environment.NewLine}{ex}");
+                }
+
+                context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+                if (context.Request.Path.StartsWithSegments("/api"))
+                {
+                    context.Response.ContentType = "application/json; charset=utf-8";
+                    await context.Response.WriteAsJsonAsync(new
+                    {
+                        message = "Sunucu geçici olarak yanıt veremedi. Tekrar deneyin."
+                    });
+                }
+            }
+            catch
+            {
+                context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+            }
+        });
+    });
     app.UseHsts();
 }
 
@@ -161,6 +200,9 @@ app.MapGet("/health", async (AppDbContext db) =>
     }
     catch (Exception ex)
     {
+        if (MySqlResilience.IsPoolPoisoning(ex))
+            MySqlResilience.ClearPools();
+
         return Results.Ok(new
         {
             status = "degraded",

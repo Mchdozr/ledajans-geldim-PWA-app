@@ -69,14 +69,22 @@
     protected override async Task OnInitializedAsync()
     {
         LocationService.Changed += OnLocationChanged;
-        await EnsureAdminLocationAsync();
-        _locationName = await LocationService.GetNameAsync();
+        await RefreshLocationAsync();
     }
 
-    protected override async Task OnParametersSetAsync()
+    protected override async Task OnParametersSetAsync() => await RefreshLocationAsync();
+
+    private async Task RefreshLocationAsync()
     {
-        await EnsureAdminLocationAsync();
-        _locationName = await LocationService.GetNameAsync();
+        try
+        {
+            await EnsureAdminLocationAsync();
+            _locationName = await LocationService.GetNameAsync();
+        }
+        catch
+        {
+            _locationName = null;
+        }
     }
 
     private async Task EnsureAdminLocationAsync()
@@ -96,8 +104,15 @@
     {
         _ = InvokeAsync(async () =>
         {
-            _locationName = await LocationService.GetNameAsync();
-            StateHasChanged();
+            try
+            {
+                _locationName = await LocationService.GetNameAsync();
+                StateHasChanged();
+            }
+            catch
+            {
+                // Menü adı okunamazsa sayfa açık kalır.
+            }
         });
     }
 

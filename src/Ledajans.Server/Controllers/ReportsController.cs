@@ -123,16 +123,25 @@ public class ReportsController : ControllerBase
         var employees = await GetActiveEmployeesAsync(locationId, department);
         var totalDays = to.DayNumber - from.DayNumber + 1;
 
-        var presentByDate = await _db.AttendanceRecords
+        var presentByDate = await _db.AttendanceRecords.AsNoTracking()
             .Where(a => a.LocationId == locationId && a.LocalDate >= from && a.LocalDate <= to)
             .Select(a => new { a.LocalDate, a.UserId })
             .ToListAsync();
         var presentSet = presentByDate.Select(x => (x.LocalDate, x.UserId)).ToHashSet();
 
+        var daysOffRows = await _db.NonWorkingDays.AsNoTracking()
+            .Where(n => n.LocationId == locationId && n.Date >= from && n.Date <= to)
+            .Select(n => new { n.Date, n.UserId, n.Type })
+            .ToListAsync();
+        var daysOff = daysOffRows
+            .Select(n => new ExcusedDayRules.Day(n.Date, n.UserId, n.Type))
+            .ToList();
+        var employeeIds = employees.Select(e => e.UserId).ToList();
+
         var rows = new List<(DateOnly Date, TodaySummaryEmployee Employee)>();
         for (var d = from; d <= to; d = d.AddDays(1))
         {
-            var excused = await GetExcusedUserIdsAsync(locationId, d);
+            var excused = ExcusedDayRules.ForDate(d, employeeIds, daysOff);
             foreach (var emp in employees)
             {
                 if (presentSet.Contains((d, emp.UserId))) continue;

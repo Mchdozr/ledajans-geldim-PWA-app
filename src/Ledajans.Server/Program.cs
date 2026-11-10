@@ -104,6 +104,8 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
     options.KnownNetworks.Clear();
     options.KnownProxies.Clear();
+    options.KnownProxies.Add(IPAddress.Loopback);
+    options.KnownProxies.Add(IPAddress.IPv6Loopback);
 });
 
 builder.Services.AddCors(options =>
@@ -115,6 +117,7 @@ builder.Services.AddCors(options =>
             if (builder.Environment.IsDevelopment()) return true;
             if (!Uri.TryCreate(origin, UriKind.Absolute, out var uri)) return false;
             return uri.Host.Equals("geldim.ledajans.com", StringComparison.OrdinalIgnoreCase)
+                || uri.Host.Equals("geldim-test.ledajans.com", StringComparison.OrdinalIgnoreCase)
                 || uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase);
         })
         .AllowAnyHeader()

@@ -1,0 +1,16 @@
+[Unit]
+Description=Ledajans Geldim Test
+After=network.target mariadb.service mysql.service
+
+[Service]
+WorkingDirectory=/var/www/geldim-test
+ExecStart=/usr/bin/dotnet /var/www/geldim-test/Ledajans.Server.dll
+Restart=always
+RestartSec=10
+User=www-data
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=ASPNETCORE_URLS=http://127.0.0.1:5001
+EnvironmentFile=/etc/geldim-test.env
+
+[Install]
+WantedBy=multi-user.target

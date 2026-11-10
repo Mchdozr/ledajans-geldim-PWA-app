@@ -1,0 +1,36 @@
+# Yerel dogrulama. Sunucuya, DNS'e ve canli siteye baglanmaz.
+services:
+  mysql:
+    image: mariadb:11
+    container_name: ledajans-mysql-test
+    environment:
+      MYSQL_ROOT_PASSWORD: dev
+      MYSQL_DATABASE: LedajansTest
+    volumes:
+      - ledajans_mysql_test:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  app:
+    build:
+      context: .
+      args:
+        APP_VERSION: geldim-test
+    container_name: ledajans-app-test
+    ports:
+      - "8081:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__DefaultConnection: "Server=mysql;Port=3306;Database=LedajansTest;User=root;Password=dev;"
+      Jwt__Key: "Ledajans-Local-Test-Key-Not-For-Server-2026!!"
+      Seed__AdminPassword: "Admin123!"
+      Seed__CreateDemoEmployees: "false"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  ledajans_mysql_test:
